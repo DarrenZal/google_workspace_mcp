@@ -22,6 +22,8 @@ from auth.oauth_config import get_oauth_config, is_stateless_mode
 from core.config import (
     get_transport_mode,
     get_oauth_redirect_uri,
+    get_oauth_callback_redirect_uri,
+    get_oauth_callback_port,
 )
 from core.context import get_fastmcp_session_id
 
@@ -897,10 +899,13 @@ async def get_authenticated_google_service(
         # Ensure OAuth callback is available
         from auth.oauth_callback_server import ensure_oauth_callback_available
 
-        redirect_uri = get_oauth_redirect_uri()
+        # Use callback-specific redirect URI and port to avoid conflicts
+        # In stdio mode, this uses a separate port (default 8001) from the main server
+        redirect_uri = get_oauth_callback_redirect_uri()
         config = get_oauth_config()
+        callback_port = get_oauth_callback_port()
         success, error_msg = ensure_oauth_callback_available(
-            get_transport_mode(), config.port, config.base_uri
+            get_transport_mode(), callback_port, config.base_uri
         )
         if not success:
             error_detail = f" ({error_msg})" if error_msg else ""

@@ -24,7 +24,11 @@ from auth.oauth_responses import (
     create_server_error_response,
 )
 from auth.google_auth import handle_auth_callback, check_client_secrets
-from auth.oauth_config import get_oauth_redirect_uri
+from auth.oauth_config import (
+    get_oauth_redirect_uri,
+    get_oauth_callback_port,
+    get_oauth_callback_redirect_uri,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,10 +36,11 @@ logger = logging.getLogger(__name__)
 class MinimalOAuthServer:
     """
     Minimal HTTP server for OAuth callbacks in stdio mode.
-    Only starts when needed and uses the same port (8000) as streamable-http mode.
+    Uses a separate port (default 8001) to avoid conflicts with any existing
+    server on port 8000. Configure via WORKSPACE_MCP_OAUTH_CALLBACK_PORT env var.
     """
 
-    def __init__(self, port: int = 8000, base_uri: str = "http://localhost"):
+    def __init__(self, port: int = 8001, base_uri: str = "http://localhost"):
         self.port = port
         self.base_uri = base_uri
         self.app = FastAPI()
@@ -226,17 +231,18 @@ _minimal_oauth_server: Optional[MinimalOAuthServer] = None
 
 
 def ensure_oauth_callback_available(
-    transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost"
+    transport_mode: str = "stdio", port: int = None, base_uri: str = "http://localhost"
 ) -> tuple[bool, str]:
     """
     Ensure OAuth callback endpoint is available for the given transport mode.
 
     For streamable-http: Assumes the main server is already running
-    For stdio: Starts a minimal server if needed
+    For stdio: Starts a minimal server on a separate port (default 8001) to avoid
+               conflicts with any existing server on port 8000
 
     Args:
         transport_mode: "stdio" or "streamable-http"
-        port: Port number (default 8000)
+        port: Port number (default: uses WORKSPACE_MCP_OAUTH_CALLBACK_PORT or 8001 for stdio)
         base_uri: Base URI (default "http://localhost")
 
     Returns:
@@ -252,6 +258,10 @@ def ensure_oauth_callback_available(
         return True, ""
 
     elif transport_mode == "stdio":
+        # In stdio mode, use a separate port (default 8001) to avoid conflicts
+        if port is None:
+            port = get_oauth_callback_port()
+
         # In stdio mode, start minimal server if not already running
         if _minimal_oauth_server is None:
             logger.info(f"Creating minimal OAuth server instance for {base_uri}:{port}")

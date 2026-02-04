@@ -11,6 +11,8 @@ import os
 from auth.oauth_config import (
     get_oauth_base_url,
     get_oauth_redirect_uri,
+    get_oauth_callback_redirect_uri,
+    get_oauth_callback_port,
     set_transport_mode,
     get_transport_mode,
     is_oauth21_enabled,
@@ -32,6 +34,8 @@ __all__ = [
     "USER_GOOGLE_EMAIL",
     "get_oauth_base_url",
     "get_oauth_redirect_uri",
+    "get_oauth_callback_redirect_uri",
+    "get_oauth_callback_port",
     "set_transport_mode",
     "get_transport_mode",
 ]

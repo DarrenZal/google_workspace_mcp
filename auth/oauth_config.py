@@ -28,6 +28,14 @@ class OAuthConfig:
         self.port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", "8000")))
         self.base_url = f"{self.base_uri}:{self.port}"
 
+        # Separate OAuth callback port for stdio mode to avoid port conflicts
+        # When running in stdio mode, the main server doesn't use a port, but OAuth
+        # callbacks need an HTTP server. Using a separate port (default 8001) avoids
+        # conflicts with any existing server on port 8000.
+        self.oauth_callback_port = int(
+            os.getenv("WORKSPACE_MCP_OAUTH_CALLBACK_PORT", "8001")
+        )
+
         # External URL for reverse proxy scenarios
         self.external_url = os.getenv("WORKSPACE_EXTERNAL_URL")
 
@@ -82,6 +90,38 @@ class OAuthConfig:
         explicit_uri = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
         if explicit_uri:
             return explicit_uri
+        return f"{self.base_url}/oauth2callback"
+
+    def get_oauth_callback_port(self) -> int:
+        """
+        Get the OAuth callback server port.
+
+        In stdio mode, this returns a separate port (default 8001) to avoid
+        conflicts with any existing server on the main port.
+        In streamable-http mode, this returns the main server port.
+
+        Returns:
+            Port number for OAuth callback server
+        """
+        if self._transport_mode == "stdio":
+            return self.oauth_callback_port
+        return self.port
+
+    def get_oauth_callback_redirect_uri(self) -> str:
+        """
+        Get the redirect URI for the OAuth callback server.
+
+        In stdio mode, uses the separate oauth_callback_port.
+        In streamable-http mode, uses the main server port.
+
+        Returns:
+            Redirect URI for OAuth callbacks
+        """
+        explicit_uri = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
+        if explicit_uri:
+            return explicit_uri
+        if self._transport_mode == "stdio":
+            return f"{self.base_uri}:{self.oauth_callback_port}/oauth2callback"
         return f"{self.base_url}/oauth2callback"
 
     @staticmethod
@@ -436,3 +476,13 @@ def is_stateless_mode() -> bool:
 def is_external_oauth21_provider() -> bool:
     """Check if external OAuth 2.1 provider mode is enabled."""
     return get_oauth_config().is_external_oauth21_provider()
+
+
+def get_oauth_callback_port() -> int:
+    """Get the OAuth callback server port."""
+    return get_oauth_config().get_oauth_callback_port()
+
+
+def get_oauth_callback_redirect_uri() -> str:
+    """Get the redirect URI for OAuth callback server."""
+    return get_oauth_config().get_oauth_callback_redirect_uri()
