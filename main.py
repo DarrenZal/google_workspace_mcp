@@ -395,11 +395,11 @@ def main():
             from auth.oauth_callback_server import ensure_oauth_callback_available
 
             success, error_msg = ensure_oauth_callback_available(
-                "stdio", port, base_uri
+                "stdio", None, base_uri
             )
             if success:
                 safe_print(
-                    f"   OAuth callback server started on {display_url}/oauth2callback"
+                    f"   OAuth callback server started on {base_uri}:{os.getenv('WORKSPACE_MCP_OAUTH_CALLBACK_PORT', '8001')}/oauth2callback"
                 )
             else:
                 warning_msg = "   ⚠️  Warning: Failed to start OAuth callback server"

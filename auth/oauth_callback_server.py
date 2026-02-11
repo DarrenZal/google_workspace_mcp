@@ -88,7 +88,8 @@ class MinimalOAuthServer:
                 # Session ID tracking removed - not needed
 
                 # Exchange code for credentials
-                redirect_uri = get_oauth_redirect_uri()
+                # Use callback-specific redirect URI (port 8001) not main server URI (port 8000)
+                redirect_uri = get_oauth_callback_redirect_uri()
                 verified_user_id, credentials = handle_auth_callback(
                     scopes=get_current_scopes(),
                     authorization_response=str(request.url),
