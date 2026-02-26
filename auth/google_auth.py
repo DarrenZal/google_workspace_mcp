@@ -95,13 +95,17 @@ else:
 
 def _find_any_credentials(
     base_dir: str = DEFAULT_CREDENTIALS_DIR,
+    preferred_email: Optional[str] = None,
 ) -> Optional[Credentials]:
     """
-    Find and load any valid credentials from the credentials directory.
+    Find and load credentials from the credentials directory.
     Used in single-user mode to bypass session-to-OAuth mapping.
 
+    If preferred_email is provided, tries that user first before falling back
+    to other available credentials.
+
     Returns:
-        First valid Credentials object found, or None if none exist.
+        Credentials object or None if none exist.
     """
     try:
         store = get_credential_store()
@@ -112,18 +116,29 @@ def _find_any_credentials(
             )
             return None
 
-        # Return credentials for the first user found
-        first_user = users[0]
-        credentials = store.get_credential(first_user)
-        if credentials:
-            logger.info(
-                f"[single-user] Found credentials for {first_user} via credential store"
-            )
-            return credentials
-        else:
-            logger.warning(
-                f"[single-user] Could not load credentials for {first_user} via credential store"
-            )
+        # If a preferred email was provided, try it first
+        if preferred_email and preferred_email in users:
+            credentials = store.get_credential(preferred_email)
+            if credentials:
+                logger.info(
+                    f"[single-user] Found credentials for preferred user {preferred_email} via credential store"
+                )
+                return credentials
+            else:
+                logger.warning(
+                    f"[single-user] Could not load credentials for preferred user {preferred_email}"
+                )
+
+        # Fall back to first available user
+        for user in users:
+            if user == preferred_email:
+                continue  # Already tried
+            credentials = store.get_credential(user)
+            if credentials:
+                logger.info(
+                    f"[single-user] Found credentials for {user} via credential store"
+                )
+                return credentials
 
     except Exception as e:
         logger.error(
@@ -622,7 +637,7 @@ def get_credentials(
         logger.info(
             "[get_credentials] Single-user mode: bypassing session mapping, finding any credentials"
         )
-        credentials = _find_any_credentials(credentials_base_dir)
+        credentials = _find_any_credentials(credentials_base_dir, preferred_email=user_google_email)
         if not credentials:
             logger.info(
                 f"[get_credentials] Single-user mode: No credentials found in {credentials_base_dir}"
