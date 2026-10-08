@@ -8,6 +8,7 @@ supporting multiple backends configurable via environment variables.
 import os
 import json
 import logging
+import tempfile
 from abc import ABC, abstractmethod
 from typing import Optional, List
 from datetime import datetime
@@ -70,6 +71,26 @@ class CredentialStore(ABC):
         pass
 
 
+def _atomic_write_json(path: str, data: dict) -> None:
+    """Write JSON so readers never see a partial file: temp file (0600) in the
+    same directory, fsync, then rename over the target."""
+    directory = os.path.dirname(path) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".tmp-", suffix=".tmp", dir=directory)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
 class LocalDirectoryCredentialStore(CredentialStore):
     """Credential store that uses local JSON files for storage."""
 
@@ -118,7 +139,7 @@ class LocalDirectoryCredentialStore(CredentialStore):
     def _get_credential_path(self, user_email: str) -> str:
         """Get the file path for a user's credentials."""
         if not os.path.exists(self.base_dir):
-            os.makedirs(self.base_dir)
+            os.makedirs(self.base_dir, mode=0o700)
             logger.info(f"Created credentials directory: {self.base_dir}")
         return os.path.join(self.base_dir, f"{user_email}.json")
 
@@ -179,11 +200,10 @@ class LocalDirectoryCredentialStore(CredentialStore):
         }
 
         try:
-            with open(creds_path, "w") as f:
-                json.dump(creds_data, f, indent=2)
+            _atomic_write_json(creds_path, creds_data)
             logger.info(f"Stored credentials for {user_email} to {creds_path}")
             return True
-        except IOError as e:
+        except (IOError, OSError) as e:
             logger.error(
                 f"Error storing credentials for {user_email} to {creds_path}: {e}"
             )
