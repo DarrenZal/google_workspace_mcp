@@ -4,7 +4,6 @@ import stat
 import threading
 from datetime import datetime, timedelta
 
-import pytest
 from google.oauth2.credentials import Credentials
 
 import auth.credential_store as cs
