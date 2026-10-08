@@ -411,6 +411,13 @@ def main():
         safe_print("")
 
         if args.transport == "streamable-http":
+            from auth.oauth_config import is_oauth21_enabled
+            from auth.request_guard_middleware import BEARER_TOKEN_ENV, get_bearer_token
+
+            if not is_oauth21_enabled() and not get_bearer_token():
+                safe_print(f"❌ {BEARER_TOKEN_ENV} is not set. HTTP mode without OAuth 2.1 requires a bearer token.")
+                sys.exit(1)
+
             # Check port availability before starting HTTP server
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

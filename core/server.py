@@ -53,6 +53,35 @@ class SecureFastMCP(FastMCP):
         logger.info("Added middleware stack: Session Management")
         return app
 
+    def http_app(self, path=None, middleware=None, **kwargs):
+        """Put the request guard outermost on every HTTP app (FastMCP 2.14 builds it here)."""
+        middleware = list(middleware or [])
+        if not is_oauth21_enabled():
+            from auth.oauth_config import get_oauth_config
+            from auth.request_guard_middleware import (
+                BEARER_TOKEN_ENV,
+                RequestGuardMiddleware,
+                get_bearer_token,
+                local_hosts,
+            )
+
+            token = get_bearer_token()
+            if not token:
+                raise RuntimeError(
+                    f"{BEARER_TOKEN_ENV} is not set; refusing to serve HTTP without a bearer token"
+                )
+            middleware.insert(
+                0,
+                Middleware(
+                    RequestGuardMiddleware,
+                    token=token,
+                    allowed_hosts=local_hosts(get_oauth_config().port),
+                    mcp_path=path or "/mcp",
+                ),
+            )
+            logger.info("Added request guard (local Host, no Origin, bearer token on MCP path)")
+        return super().http_app(path=path, middleware=middleware, **kwargs)
+
 
 server = SecureFastMCP(
     name="google_workspace",
